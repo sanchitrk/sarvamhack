@@ -1,5 +1,17 @@
+type ConversationMessage = {
+  role: "user" | "assistant";
+  text: string;
+};
+
+type SessionSummary = {
+  id: string;
+  modified: string;
+  firstMessage: string;
+};
+
 type ServerMessage =
   | { type: "ready" }
+  | { type: "session"; id: string; history: ConversationMessage[] }
   | { type: "state"; value: string }
   | { type: "speech_start" }
   | { type: "speech_end" }
@@ -34,6 +46,14 @@ const stateLabel = requiredElement("#state-label");
 const stateDetail = requiredElement("#state-detail");
 const textForm = requiredElement<HTMLFormElement>("#text-form");
 const textInput = requiredElement<HTMLInputElement>("#text-input");
+const sessionSelect = requiredElement<HTMLSelectElement>("#session-select");
+const newSessionButton = requiredElement<HTMLButtonElement>("#new-session");
+const history = requiredElement("#history");
+const historyCount = requiredElement("#history-count");
+const uploadForm = requiredElement<HTMLFormElement>("#upload-form");
+const fileInput = requiredElement<HTMLInputElement>("#file-input");
+const uploadButton = requiredElement<HTMLButtonElement>("#upload-button");
+const uploadStatus = requiredElement("#upload-status");
 
 let socket: WebSocket | undefined;
 let mediaStream: MediaStream | undefined;
@@ -41,6 +61,8 @@ let audioContext: AudioContext | undefined;
 let sourceNode: MediaStreamAudioSourceNode | undefined;
 let workletNode: AudioWorkletNode | undefined;
 let currentAudio: HTMLAudioElement | undefined;
+let activeSessionId = window.localStorage.getItem("vaani-session") || "";
+let historyMessages: ConversationMessage[] = [];
 let recording = false;
 let responseText = "";
 let ttsEnded = false;
@@ -53,7 +75,7 @@ const stateCopy: Record<string, [string, string]> = {
   hearing: ["I hear you", "Keep speaking — I’ll detect when you finish"],
   thinking: ["Thinking", "Reasoning about what you said"],
   speaking: ["Speaking", "You can interrupt me at any time"],
-  tool: ["Working", "Using a tool to help with your request"],
+  tool: ["Reading", "Inspecting your uploaded context"],
   error: ["Something went wrong", "Try stopping and starting again"],
 };
 
@@ -82,6 +104,62 @@ function parseMessage(value: string): ServerMessage | undefined {
   } catch {
     return undefined;
   }
+}
+
+function renderHistory(messages: ConversationMessage[]): void {
+  historyMessages = [...messages];
+  history.replaceChildren();
+
+  if (messages.length === 0) {
+    const empty = document.createElement("p");
+    empty.className = "history-empty";
+    empty.textContent = "This conversation is just getting started.";
+    history.append(empty);
+  } else {
+    for (const message of messages) {
+      const item = document.createElement("article");
+      item.className = `history-message ${message.role}`;
+      const role = document.createElement("span");
+      role.textContent = message.role === "user" ? "You" : "Vaani";
+      const text = document.createElement("p");
+      text.textContent = message.text;
+      item.append(role, text);
+      history.append(item);
+    }
+  }
+
+  historyCount.textContent = `${messages.length} ${messages.length === 1 ? "message" : "messages"}`;
+  history.scrollTop = history.scrollHeight;
+}
+
+function appendHistory(message: ConversationMessage): void {
+  renderHistory([...historyMessages, message]);
+}
+
+async function refreshSessions(): Promise<void> {
+  const response = await fetch("/api/sessions");
+  if (!response.ok) throw new Error("Could not load conversations");
+  const payload = (await response.json()) as { sessions: SessionSummary[] };
+  sessionSelect.replaceChildren();
+
+  if (activeSessionId && !payload.sessions.some((session) => session.id === activeSessionId)) {
+    const current = document.createElement("option");
+    current.value = activeSessionId;
+    current.textContent = "New conversation";
+    sessionSelect.append(current);
+  }
+
+  for (const session of payload.sessions) {
+    const option = document.createElement("option");
+    option.value = session.id;
+    const title =
+      session.firstMessage === "(no messages)"
+        ? "New conversation"
+        : session.firstMessage.replace(/\s+/g, " ").slice(0, 54);
+    option.textContent = title;
+    sessionSelect.append(option);
+  }
+  sessionSelect.value = activeSessionId;
 }
 
 function cancelAudio(): void {
@@ -124,6 +202,17 @@ function handleMessage(message: ServerMessage): void {
     connectionLabel.textContent = "Connected";
     return;
   }
+  if (message.type === "session") {
+    activeSessionId = message.id;
+    window.localStorage.setItem("vaani-session", message.id);
+    renderHistory(message.history);
+    setText(transcript, "");
+    setText(response, "");
+    detectedLanguage.textContent = "—";
+    uploadButton.disabled = false;
+    void refreshSessions().catch(() => undefined);
+    return;
+  }
   if (message.type === "state") {
     setState(message.value);
     return;
@@ -131,6 +220,7 @@ function handleMessage(message: ServerMessage): void {
   if (message.type === "transcript") {
     setText(transcript, message.text);
     detectedLanguage.textContent = message.language;
+    appendHistory({ role: "user", text: message.text });
     return;
   }
   if (message.type === "assistant_start") {
@@ -144,7 +234,10 @@ function handleMessage(message: ServerMessage): void {
     return;
   }
   if (message.type === "assistant_end") {
-    setText(response, message.text || responseText);
+    const text = message.text || responseText;
+    setText(response, text);
+    if (text) appendHistory({ role: "assistant", text });
+    void refreshSessions().catch(() => undefined);
     return;
   }
   if (message.type === "tts_start") {
@@ -173,7 +266,8 @@ function handleMessage(message: ServerMessage): void {
 
 function connect(): void {
   const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
-  socket = new WebSocket(`${protocol}//${window.location.host}/ws`);
+  const query = activeSessionId ? `?session=${encodeURIComponent(activeSessionId)}` : "";
+  socket = new WebSocket(`${protocol}//${window.location.host}/ws${query}`);
   socket.addEventListener("message", (event) => {
     if (typeof event.data !== "string") return;
     const message = parseMessage(event.data);
@@ -256,9 +350,54 @@ textForm.addEventListener("submit", (event) => {
   textInput.value = "";
 });
 
+sessionSelect.addEventListener("change", () => {
+  const sessionId = sessionSelect.value;
+  if (!sessionId || sessionId === activeSessionId) return;
+  cancelAudio();
+  setState("connecting");
+  send({ type: "open_session", sessionId });
+});
+
+newSessionButton.addEventListener("click", () => {
+  cancelAudio();
+  setState("connecting");
+  send({ type: "new_session" });
+});
+
+uploadForm.addEventListener("submit", (event) => {
+  event.preventDefault();
+  void (async () => {
+    const file = fileInput.files?.[0];
+    if (!file) throw new Error("Choose a file first");
+    if (!activeSessionId) throw new Error("The conversation is still connecting");
+
+    uploadButton.disabled = true;
+    uploadStatus.textContent = `Uploading ${file.name}…`;
+    const body = new FormData();
+    body.append("file", file);
+    const result = await fetch(`/api/sessions/${encodeURIComponent(activeSessionId)}/files`, {
+      method: "POST",
+      body,
+    });
+    const payload = (await result.json()) as { name?: string; error?: string };
+    if (!result.ok || !payload.name) throw new Error(payload.error || "Upload failed");
+
+    uploadStatus.textContent = `${payload.name} uploaded. Vaani is reading it now.`;
+    fileInput.value = "";
+    send({ type: "file", name: payload.name });
+  })()
+    .catch((error: unknown) => {
+      uploadStatus.textContent = error instanceof Error ? error.message : String(error);
+    })
+    .finally(() => {
+      uploadButton.disabled = !activeSessionId;
+    });
+});
+
 window.addEventListener("beforeunload", () => {
   for (const track of mediaStream?.getTracks() || []) track.stop();
   socket?.close();
 });
 
+uploadButton.disabled = !activeSessionId;
 connect();

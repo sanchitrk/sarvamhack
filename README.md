@@ -59,6 +59,19 @@ The browser sends 16 kHz mono PCM to Sarvam Saaras v3 over the Hono WebSocket.
 Final transcripts enter the Layer 1 Pi/OpenAI loop. Assistant deltas are split
 into speakable sentences and synthesized with Sarvam Bulbul v3.
 
+## Layer 3 sessions and files
+
+Conversations now use Pi coding-agent's persistent sessions and survive browser
+reconnects and server restarts. Use the conversation selector in the UI to
+reopen history or start a new conversation.
+
+Upload a supported text or source file from the UI and Vaani will inspect it
+with Pi's read-only `read`, `grep`, `find`, and `ls` tools. Uploads and session
+JSONL files are stored locally under `apps/voice/.data/` and are not committed.
+
+Supported uploads include text, Markdown, CSV, JSON, YAML, XML, HTML, CSS, and
+common source-code files up to 5 MB.
+
 ## Commands
 
 ```sh

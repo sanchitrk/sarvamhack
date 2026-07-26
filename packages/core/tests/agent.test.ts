@@ -9,8 +9,10 @@ import { AgentBusyError, AgentCancelledError, AgentInputError } from "../src/err
 import type { AgentEvent } from "../src/events.ts";
 
 class FakeHarness implements AgentHarnessAdapter {
+  readonly sessionId = "session-1";
   readonly prompts: string[] = [];
   readonly listeners = new Set<(event: HarnessEvent) => void | Promise<void>>();
+  disposed = false;
   response = "Hello there";
   pending = false;
   release: (() => void) | undefined;
@@ -27,6 +29,17 @@ class FakeHarness implements AgentHarnessAdapter {
 
   async abort(): Promise<void> {
     this.release?.();
+  }
+
+  history() {
+    return [
+      { role: "user" as const, text: "hello" },
+      { role: "assistant" as const, text: this.response },
+    ];
+  }
+
+  dispose(): void {
+    this.disposed = true;
   }
 
   subscribe(listener: (event: HarnessEvent) => void | Promise<void>): () => void {
@@ -152,5 +165,19 @@ describe("agent runtime", () => {
     await expect(runtime.prompt("hello")).rejects.toBe(failure);
     expect(events.filter((event) => event.type === "turn_error")).toHaveLength(1);
     expect(runtime.busy).toBe(false);
+  });
+
+  it("exposes session history and disposes the harness", async () => {
+    const harness = new FakeHarness();
+    const runtime = await createRuntimeWithHarness(async () => harness);
+
+    expect(runtime.sessionId).toBe("session-1");
+    expect(runtime.history()).toEqual([
+      { role: "user", text: "hello" },
+      { role: "assistant", text: "Hello there" },
+    ]);
+
+    runtime.dispose();
+    expect(harness.disposed).toBe(true);
   });
 });

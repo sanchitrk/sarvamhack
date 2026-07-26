@@ -1,4 +1,7 @@
+import { randomUUID } from "node:crypto";
+import { access, mkdir } from "node:fs/promises";
 import { loadEnvFile } from "node:process";
+import { join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { serve, type WebSocketData, upgradeWebSocket } from "@hono/node-server";
@@ -9,11 +12,13 @@ import { WebSocket as UpstreamSocket, WebSocketServer } from "ws";
 
 import {
   createAgent,
+  listAgentSessions,
   readAgentConfig,
   type AgentEvent,
   type AgentRuntime,
 } from "../../../packages/core/src/index.ts";
 import { createSentenceBuffer } from "./sentence.ts";
+import { isSessionId, maxUploadBytes, storeUpload, uploadName, workspacePath } from "./storage.ts";
 
 try {
   loadEnvFile(fileURLToPath(new URL("../../../packages/core/.env.local", import.meta.url)));
@@ -33,6 +38,18 @@ const sarvamApiKey = requiredEnvironment("SARVAM_API_KEY");
 
 const port = Number(process.env.PORT || 3000);
 const clientRoot = fileURLToPath(new URL("../dist/client", import.meta.url));
+const dataRoot = process.env.VOICE_DATA_DIR?.trim()
+  ? resolve(process.env.VOICE_DATA_DIR)
+  : fileURLToPath(new URL("../.data", import.meta.url));
+const sessionsDir = join(dataRoot, "sessions");
+const workspacesDir = join(dataRoot, "workspaces");
+const agentDir = join(dataRoot, "agent");
+await Promise.all([
+  mkdir(sessionsDir, { recursive: true }),
+  mkdir(workspacesDir, { recursive: true }),
+  mkdir(agentDir, { recursive: true }),
+]);
+
 const supportedTtsLanguages = new Set([
   "bn-IN",
   "en-IN",
@@ -52,7 +69,10 @@ type ClientMessage =
   | { type: "stop" }
   | { type: "cancel" }
   | { type: "text"; text: string }
-  | { type: "playback_done" };
+  | { type: "playback_done" }
+  | { type: "new_session" }
+  | { type: "open_session"; sessionId: string }
+  | { type: "file"; name: string };
 
 interface SarvamMessage {
   type?: unknown;
@@ -75,7 +95,12 @@ function parseClientMessage(value: string): ClientMessage | undefined {
       return undefined;
     }
     const type = parsed.type;
-    if (type === "stop" || type === "cancel" || type === "playback_done") {
+    if (
+      type === "stop" ||
+      type === "cancel" ||
+      type === "playback_done" ||
+      type === "new_session"
+    ) {
       return { type };
     }
     if (type === "start") {
@@ -87,6 +112,12 @@ function parseClientMessage(value: string): ClientMessage | undefined {
     }
     if (type === "text" && "text" in parsed && typeof parsed.text === "string") {
       return { type, text: parsed.text };
+    }
+    if (type === "open_session" && "sessionId" in parsed && typeof parsed.sessionId === "string") {
+      return { type, sessionId: parsed.sessionId };
+    }
+    if (type === "file" && "name" in parsed && typeof parsed.name === "string") {
+      return { type, name: parsed.name };
     }
     return undefined;
   } catch {
@@ -118,9 +149,27 @@ async function messageBytes(value: Exclude<WSMessageReceive, string>): Promise<B
   return Buffer.from(new Uint8Array(value));
 }
 
+async function createSessionAgent(requestedId?: string): Promise<AgentRuntime> {
+  const sessionId = requestedId && isSessionId(requestedId) ? requestedId : randomUUID();
+  const workspace = workspacePath(workspacesDir, sessionId);
+  await mkdir(workspace, { recursive: true });
+  return createAgent(
+    {
+      ...readAgentConfig(),
+      cwd: workspace,
+    },
+    {
+      agentDir,
+      sessionId,
+      sessionsDir,
+    },
+  );
+}
+
 class VoiceSession {
-  private readonly agent: AgentRuntime;
+  private agent: AgentRuntime;
   private readonly sentences = createSentenceBuffer();
+  private unsubscribeAgent: () => void;
   private client: WSContext | undefined;
   private stt: UpstreamSocket | undefined;
   private language = "en-IN";
@@ -134,16 +183,17 @@ class VoiceSession {
 
   private constructor(agent: AgentRuntime) {
     this.agent = agent;
-    agent.subscribe((event) => this.handleAgentEvent(event));
+    this.unsubscribeAgent = agent.subscribe((event) => this.handleAgentEvent(event));
   }
 
-  static async create(): Promise<VoiceSession> {
-    return new VoiceSession(await createAgent(readAgentConfig()));
+  static async create(sessionId?: string): Promise<VoiceSession> {
+    return new VoiceSession(await createSessionAgent(sessionId));
   }
 
   open(client: WSContext): void {
     this.client = client;
     this.send({ type: "ready" });
+    this.publishSession();
     this.state("idle");
   }
 
@@ -154,11 +204,17 @@ class VoiceSession {
         this.fail("Invalid client message");
         return;
       }
-      void this.handleControl(message);
+      void this.handleControl(message).catch((error: unknown) => {
+        this.fail(error instanceof Error ? error.message : String(error));
+      });
       return;
     }
 
-    void messageBytes(value).then((bytes) => this.sendAudio(bytes));
+    void messageBytes(value)
+      .then((bytes) => this.sendAudio(bytes))
+      .catch((error: unknown) => {
+        this.fail(error instanceof Error ? error.message : String(error));
+      });
   }
 
   close(): void {
@@ -166,6 +222,8 @@ class VoiceSession {
     this.stt?.close();
     this.cancelTts();
     void this.agent.abort("client disconnected");
+    this.unsubscribeAgent();
+    this.agent.dispose();
   }
 
   private send(message: object): void {
@@ -178,12 +236,37 @@ class VoiceSession {
     this.send({ type: "state", value });
   }
 
+  private publishSession(): void {
+    this.send({
+      type: "session",
+      id: this.agent.sessionId,
+      history: this.agent.history(),
+    });
+  }
+
   private fail(message: string): void {
     this.send({ type: "error", message });
     this.state("error");
   }
 
   private async handleControl(message: ClientMessage): Promise<void> {
+    if (message.type === "new_session") {
+      await this.replaceAgent();
+      return;
+    }
+    if (message.type === "open_session") {
+      if (!isSessionId(message.sessionId)) {
+        this.fail("Invalid session ID");
+        return;
+      }
+      const sessions = await listAgentSessions(sessionsDir);
+      if (!sessions.some((session) => session.id === message.sessionId)) {
+        this.fail("Conversation not found");
+        return;
+      }
+      await this.replaceAgent(message.sessionId);
+      return;
+    }
     if (message.type === "start") {
       this.connectStt(message.language || "unknown");
       return;
@@ -204,7 +287,44 @@ class VoiceSession {
       this.state("listening");
       return;
     }
+    if (message.type === "file") {
+      let name: string;
+      try {
+        name = uploadName(message.name);
+      } catch (error) {
+        this.fail(error instanceof Error ? error.message : String(error));
+        return;
+      }
+      const workspace = workspacePath(workspacesDir, this.agent.sessionId);
+      try {
+        await access(join(workspace, name));
+      } catch {
+        this.fail("Uploaded file not found");
+        return;
+      }
+      await this.submitTranscript(
+        `I uploaded "${name}". Read it with your file tools and briefly explain its contents.`,
+        this.language,
+      );
+      return;
+    }
     await this.submitTranscript(message.text, this.language);
+  }
+
+  private async replaceAgent(sessionId?: string): Promise<void> {
+    await this.interrupt("session changed");
+    this.unsubscribeAgent();
+    this.agent.dispose();
+    const agent = await createSessionAgent(sessionId);
+    if (this.closed) {
+      agent.dispose();
+      return;
+    }
+    this.agent = agent;
+    this.unsubscribeAgent = agent.subscribe((event) => this.handleAgentEvent(event));
+    this.lastTranscript = "";
+    this.publishSession();
+    this.state("idle");
   }
 
   private connectStt(language: string): void {
@@ -426,11 +546,46 @@ app.get("/health", (context) =>
     tts: "bulbul:v3",
   }),
 );
+app.get("/api/sessions", async (context) =>
+  context.json({
+    sessions: await listAgentSessions(sessionsDir),
+  }),
+);
+app.post("/api/sessions/:sessionId/files", async (context) => {
+  const sessionId = context.req.param("sessionId");
+  if (!isSessionId(sessionId)) return context.json({ error: "Invalid session ID" }, 400);
+
+  try {
+    await access(workspacePath(workspacesDir, sessionId));
+  } catch {
+    return context.json({ error: "Conversation not found" }, 404);
+  }
+
+  const body = await context.req.parseBody();
+  const file = body.file;
+  if (!(file instanceof File)) return context.json({ error: "A file is required" }, 400);
+  if (file.size > maxUploadBytes) {
+    return context.json({ error: "File exceeds the 5 MB limit" }, 413);
+  }
+
+  try {
+    const name = await storeUpload(
+      workspacesDir,
+      sessionId,
+      file.name,
+      new Uint8Array(await file.arrayBuffer()),
+    );
+    return context.json({ name });
+  } catch (error) {
+    return context.json({ error: error instanceof Error ? error.message : String(error) }, 400);
+  }
+});
 app.get(
   "/ws",
   upgradeWebSocket(
-    async () => {
-      const session = await VoiceSession.create();
+    async (context) => {
+      const requestedSession = context.req.query("session");
+      const session = await VoiceSession.create(requestedSession);
       return {
         onOpen(_event, client) {
           session.open(client);

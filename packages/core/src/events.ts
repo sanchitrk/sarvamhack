@@ -1,12 +1,30 @@
-import type { AgentTool } from "@earendil-works/pi-agent-core";
-
 export interface AgentConfig {
   provider: "openai";
   model: string;
   apiKey: string;
   systemPrompt: string;
-  tools?: AgentTool[];
+  toolNames?: Array<"read" | "grep" | "find" | "ls">;
   cwd?: string;
+}
+
+export interface ConversationMessage {
+  role: "user" | "assistant";
+  text: string;
+}
+
+export interface AgentSessionSummary {
+  id: string;
+  name?: string;
+  created: string;
+  modified: string;
+  messageCount: number;
+  firstMessage: string;
+}
+
+export interface AgentSessionOptions {
+  sessionId?: string;
+  sessionsDir?: string;
+  agentDir?: string;
 }
 
 export type AgentEvent =
@@ -31,6 +49,9 @@ export interface AgentRuntime {
   prompt(text: string): Promise<string>;
   abort(reason?: string): Promise<void>;
   reset(): Promise<void>;
+  history(): ConversationMessage[];
+  dispose(): void;
   subscribe(listener: AgentEventListener): () => void;
   readonly busy: boolean;
+  readonly sessionId: string;
 }

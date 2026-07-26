@@ -39,6 +39,16 @@
       </section>
 
       <section class="conversation" aria-live="polite">
+        <div class="session-toolbar">
+          <label>
+            <span>Conversation</span>
+            <select id="session-select" aria-label="Previous conversations">
+              <option value="">Current conversation</option>
+            </select>
+          </label>
+          <button id="new-session" class="secondary-button" type="button">New conversation</button>
+        </div>
+
         <div class="voice-stage">
           <div id="orb" class="orb" data-state="idle" aria-hidden="true">
             <div class="orb-core"></div>
@@ -89,6 +99,16 @@
           </article>
         </div>
 
+        <section class="history-panel" aria-label="Conversation history">
+          <div class="section-heading">
+            <span>Conversation history</span>
+            <span id="history-count">0 messages</span>
+          </div>
+          <div id="history" class="history">
+            <p class="history-empty">This conversation is just getting started.</p>
+          </div>
+        </section>
+
         <form id="text-form" class="text-form">
           <label for="text-input">Or type a message</label>
           <div class="text-row">
@@ -100,6 +120,24 @@
               placeholder="Ask Vaani anything…"
             />
             <button type="submit">Send</button>
+          </div>
+        </form>
+
+        <form id="upload-form" class="upload-form">
+          <div>
+            <label for="file-input">Give Vaani a file to read</label>
+            <p id="upload-status">Text, code, Markdown, JSON, or CSV · maximum 5 MB</p>
+          </div>
+          <div class="upload-actions">
+            <input
+              id="file-input"
+              name="file"
+              type="file"
+              accept=".txt,.text,.md,.csv,.json,.yaml,.yml,.xml,.html,.htm,.css,.js,.jsx,.ts,.tsx,.py,.java,.go,.rs,.sql"
+            />
+            <button id="upload-button" class="secondary-button" type="submit">
+              Upload and read
+            </button>
           </div>
         </form>
       </section>

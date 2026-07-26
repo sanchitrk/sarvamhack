@@ -1,4 +1,4 @@
-import { getModels, type Api, type Model } from "@earendil-works/pi-ai";
+import { getModels, type Api, type Model } from "@earendil-works/pi-ai/compat";
 
 import { AgentConfigError } from "./errors.ts";
 import type { AgentConfig } from "./events.ts";

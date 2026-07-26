@@ -1,12 +1,21 @@
 import { randomUUID } from "node:crypto";
+import { join } from "node:path";
 
+import type { AgentMessage } from "@earendil-works/pi-agent-core";
 import {
-  AgentHarness,
-  InMemorySessionRepo,
-  type AgentHarnessEvent,
-} from "@earendil-works/pi-agent-core";
-import { NodeExecutionEnv } from "@earendil-works/pi-agent-core/node";
-import type { AssistantMessage, TextContent } from "@earendil-works/pi-ai";
+  createAgentSession,
+  DefaultResourceLoader,
+  ModelRuntime,
+  type AgentSessionEvent,
+  SessionManager,
+  SettingsManager,
+} from "@earendil-works/pi-coding-agent";
+import {
+  InMemoryCredentialStore,
+  type AssistantMessage,
+  type TextContent,
+  type UserMessage,
+} from "@earendil-works/pi-ai";
 
 import { resolveOpenAIModel } from "./config.ts";
 import {
@@ -15,7 +24,15 @@ import {
   AgentConfigError,
   AgentInputError,
 } from "./errors.ts";
-import type { AgentConfig, AgentEvent, AgentEventListener, AgentRuntime } from "./events.ts";
+import type {
+  AgentConfig,
+  AgentEvent,
+  AgentEventListener,
+  AgentRuntime,
+  AgentSessionOptions,
+  AgentSessionSummary,
+  ConversationMessage,
+} from "./events.ts";
 
 export type HarnessEvent =
   | { type: "assistant_start" }
@@ -27,6 +44,9 @@ export interface AgentHarnessAdapter {
   prompt(text: string): Promise<string>;
   abort(): Promise<void>;
   subscribe(listener: (event: HarnessEvent) => void | Promise<void>): () => void;
+  history?(): ConversationMessage[];
+  dispose?(): void;
+  readonly sessionId?: string;
 }
 
 export type AgentHarnessFactory = () => Promise<AgentHarnessAdapter>;
@@ -42,15 +62,30 @@ function toError(error: unknown): Error {
   return error instanceof Error ? error : new Error(String(error));
 }
 
-function assistantText(message: AssistantMessage): string {
-  return message.content
+function contentText(content: UserMessage["content"] | AssistantMessage["content"]): string {
+  if (typeof content === "string") return content.trim();
+  return content
     .filter((entry): entry is TextContent => entry.type === "text")
     .map((entry) => entry.text)
     .join("")
     .trim();
 }
 
-export function translatePiEvent(event: AgentHarnessEvent): HarnessEvent | undefined {
+function assistantText(message: AssistantMessage): string {
+  return contentText(message.content);
+}
+
+function conversationHistory(messages: AgentMessage[]): ConversationMessage[] {
+  const history: ConversationMessage[] = [];
+  for (const message of messages) {
+    if (message.role !== "user" && message.role !== "assistant") continue;
+    const text = contentText(message.content);
+    if (text) history.push({ role: message.role, text });
+  }
+  return history;
+}
+
+export function translatePiEvent(event: AgentSessionEvent): HarnessEvent | undefined {
   if (event.type === "message_start" && event.message.role === "assistant") {
     return { type: "assistant_start" };
   }
@@ -98,7 +133,7 @@ export async function createRuntimeWithHarness(
       try {
         await listener(event);
       } catch {
-        // A UI, logger, or future speech listener must not break the agent loop.
+        // A UI, logger, or speech listener must not break the agent loop.
       }
     }
   }
@@ -165,6 +200,10 @@ export async function createRuntimeWithHarness(
       return activeTurn !== undefined;
     },
 
+    get sessionId() {
+      return harness.sessionId || "memory";
+    },
+
     async prompt(text) {
       const normalized = text.trim();
       if (!normalized) {
@@ -218,8 +257,19 @@ export async function createRuntimeWithHarness(
         await abortTurn("session reset");
       }
       unsubscribeHarness();
+      harness.dispose?.();
       harness = await createHarness();
       unsubscribeHarness = harness.subscribe(forward);
+    },
+
+    history() {
+      return harness.history?.() || [];
+    },
+
+    dispose() {
+      unsubscribeHarness();
+      harness.dispose?.();
+      listeners.clear();
     },
 
     subscribe(listener) {
@@ -229,39 +279,117 @@ export async function createRuntimeWithHarness(
   };
 }
 
-export async function createAgent(config: AgentConfig): Promise<AgentRuntime> {
+async function sessionManagerFor(
+  cwd: string,
+  options: AgentSessionOptions,
+): Promise<SessionManager> {
+  const sessionId = options.sessionId;
+  if (!sessionId) return SessionManager.create(cwd, options.sessionsDir);
+
+  const sessions = options.sessionsDir
+    ? await SessionManager.listAll(options.sessionsDir)
+    : await SessionManager.list(cwd);
+  const existing = sessions.find((session) => session.id === sessionId);
+  return existing
+    ? SessionManager.open(existing.path, options.sessionsDir, cwd)
+    : SessionManager.create(cwd, options.sessionsDir, { id: sessionId });
+}
+
+export async function listAgentSessions(sessionsDir: string): Promise<AgentSessionSummary[]> {
+  const sessions = await SessionManager.listAll(sessionsDir);
+  return sessions.map((session) => ({
+    id: session.id,
+    name: session.name,
+    created: session.created.toISOString(),
+    modified: session.modified.toISOString(),
+    messageCount: session.messageCount,
+    firstMessage: session.firstMessage,
+  }));
+}
+
+export async function createAgent(
+  config: AgentConfig,
+  options: AgentSessionOptions = {},
+): Promise<AgentRuntime> {
   if (!config.apiKey.trim()) {
     throw new AgentConfigError("OpenAI API key cannot be blank");
   }
 
   const model = resolveOpenAIModel(config.model);
-  const sessions = new InMemorySessionRepo();
-  const environment = new NodeExecutionEnv({
-    cwd: config.cwd || process.cwd(),
-  });
+  const cwd = config.cwd || process.cwd();
+  const agentDir = options.agentDir || join(options.sessionsDir || cwd, ".agent");
+  let requestedSessionId = options.sessionId;
 
   return createRuntimeWithHarness(async () => {
-    const session = await sessions.create({ id: randomUUID() });
-    const harness = new AgentHarness({
-      env: environment,
-      session,
+    const sessionManager = await sessionManagerFor(cwd, {
+      ...options,
+      sessionId: requestedSessionId,
+    });
+    requestedSessionId = undefined;
+
+    const credentials = new InMemoryCredentialStore();
+    await credentials.modify("openai", async () => ({
+      type: "api_key",
+      key: config.apiKey,
+    }));
+    const modelRuntime = await ModelRuntime.create({
+      credentials,
+      modelsPath: null,
+    });
+
+    const resourceLoader = new DefaultResourceLoader({
+      cwd,
+      agentDir,
+      noContextFiles: true,
+      noExtensions: true,
+      noPromptTemplates: true,
+      noSkills: true,
+      noThemes: true,
+      systemPrompt: `${config.systemPrompt}
+
+You can inspect files in the current workspace with read, grep, find, and ls.
+When the user uploads or asks about a file, use those tools before answering.
+Never claim to have read a file unless a tool successfully returned its contents.`,
+    });
+    await resourceLoader.reload();
+
+    const { session } = await createAgentSession({
+      cwd,
+      agentDir,
       model,
-      tools: config.tools || [],
-      systemPrompt: config.systemPrompt,
-      getApiKeyAndHeaders: async () => ({ apiKey: config.apiKey }),
+      thinkingLevel: "off",
+      modelRuntime,
+      resourceLoader,
+      sessionManager,
+      settingsManager: SettingsManager.inMemory({
+        compaction: { enabled: true },
+        retry: { enabled: true, maxRetries: 2 },
+      }),
+      tools: config.toolNames || ["read", "grep", "find", "ls"],
     });
 
     return {
+      sessionId: session.sessionId,
       async prompt(text) {
-        return assistantText(await harness.prompt(text));
+        await session.prompt(text, { expandPromptTemplates: false });
+        const response = [...session.state.messages]
+          .reverse()
+          .find((message): message is AssistantMessage => message.role === "assistant");
+        return response ? assistantText(response) : "";
       },
       async abort() {
-        await harness.abort();
+        await session.abort();
+      },
+      history() {
+        return conversationHistory(session.state.messages);
+      },
+      dispose() {
+        session.dispose();
       },
       subscribe(listener) {
-        return harness.subscribe(async (event) => {
+        return session.subscribe((event) => {
           const translated = translatePiEvent(event);
-          if (translated) await listener(translated);
+          if (translated) void listener(translated);
         });
       },
     };

@@ -5,147 +5,166 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta
       name="description"
-      content="A multilingual voice agent powered by Sarvam speech and Pi."
+      content="Vaani, a multilingual voice agent powered by Sarvam speech."
     />
-    <title>Vaani — Voice Agent</title>
+    <title>Vaani</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
-      href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600&family=Manrope:wght@600;700;800&display=swap"
+      href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600&display=swap"
       rel="stylesheet"
     />
     <link rel="stylesheet" href="/src/style.css" />
   </head>
   <body>
-    <main class="shell">
-      <nav>
-        <a class="brand" href="/" aria-label="Vaani home">
-          <span class="brand-mark" aria-hidden="true"></span>
-          Vaani
-        </a>
-        <div class="connection">
+    <main class="app-shell">
+      <header class="topbar">
+        <span class="brand" aria-label="Vaani">Vaani</span>
+        <div class="connection" title="Voice server status">
           <span id="connection-dot" class="connection-dot"></span>
           <span id="connection-label">Connecting</span>
         </div>
-      </nav>
+      </header>
 
-      <section class="hero">
-        <div class="eyebrow">Sarvam × Pi</div>
-        <h1>Speak naturally.<br /><span>Vaani listens.</span></h1>
-        <p>
-          A multilingual voice agent that understands Indian speech and responds with a natural
-          voice.
-        </p>
+      <section class="conversation-view" aria-label="Conversation" aria-live="polite">
+        <div id="history" class="history">
+          <p class="history-empty">Ask with your voice or type below.</p>
+        </div>
       </section>
 
-      <section class="conversation" aria-live="polite">
-        <div class="session-toolbar">
-          <label>
-            <span>Conversation</span>
-            <select id="session-select" aria-label="Previous conversations">
-              <option value="">Current conversation</option>
-            </select>
-          </label>
-          <button id="new-session" class="secondary-button" type="button">New conversation</button>
-        </div>
-
-        <div class="voice-stage">
+      <section class="voice-dock" aria-label="Talk to Vaani">
+        <div class="orb-wrap">
           <div id="orb" class="orb" data-state="idle" aria-hidden="true">
-            <div class="orb-core"></div>
             <div class="orb-ring orb-ring-one"></div>
             <div class="orb-ring orb-ring-two"></div>
+            <div class="orb-core"></div>
           </div>
-          <div id="state-label" class="state-label">Ready when you are</div>
-          <div id="state-detail" class="state-detail">Press start and allow microphone access</div>
+          <div class="state-copy">
+            <span id="state-label" class="state-label">Ready when you are</span>
+            <span id="state-detail" class="state-detail">Type a message or tap the microphone</span>
+          </div>
         </div>
 
-        <div class="controls">
-          <label class="language-control">
-            <span>Input language</span>
-            <select id="language">
-              <option value="unknown">Auto-detect</option>
-              <option value="en-IN">English</option>
-              <option value="hi-IN">हिन्दी</option>
-              <option value="bn-IN">বাংলা</option>
-              <option value="ta-IN">தமிழ்</option>
-              <option value="te-IN">తెలుగు</option>
-              <option value="kn-IN">ಕನ್ನಡ</option>
-              <option value="ml-IN">മലയാളം</option>
-              <option value="mr-IN">मराठी</option>
-              <option value="gu-IN">ગુજરાતી</option>
-              <option value="pa-IN">ਪੰਜਾਬੀ</option>
-            </select>
-          </label>
-          <button id="voice-button" class="voice-button" type="button">
-            <span class="mic" aria-hidden="true"></span>
-            <span id="voice-button-label">Start conversation</span>
-          </button>
-          <button id="interrupt-button" class="interrupt-button" type="button" disabled>
-            <span class="stop-icon" aria-hidden="true"></span>
-            Interrupt response
-          </button>
-        </div>
+        <form id="text-form" class="composer">
+          <textarea
+            id="text-input"
+            name="message"
+            rows="1"
+            autocomplete="off"
+            aria-label="Message Vaani"
+            placeholder="Do anything"
+          ></textarea>
 
-        <div class="transcript-grid">
-          <article class="message-card">
-            <div class="message-meta">
-              <span>You</span>
-              <span id="detected-language">—</span>
+          <div class="composer-toolbar">
+            <div class="toolbar-group">
+              <button id="add-button" class="icon-button" type="button" aria-label="Attach a file">
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                  <path d="M12 5v14M5 12h14" />
+                </svg>
+              </button>
+              <button
+                id="settings-button"
+                class="mode-button"
+                type="button"
+                aria-expanded="false"
+                aria-controls="settings-panel"
+              >
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                  <path
+                    d="M12 15.2a3.2 3.2 0 1 0 0-6.4 3.2 3.2 0 0 0 0 6.4ZM19 13.3v-2.6l-2-.7-.5-1.1.9-1.9-1.9-1.9-1.9.9-1.1-.5-.7-2H9.2l-.7 2-1.1.5-1.9-.9L3.6 7l.9 1.9-.5 1.1-2 .7v2.6l2 .7.5 1.1-.9 1.9 1.9 1.9 1.9-.9 1.1.5.7 2h2.6l.7-2 1.1-.5 1.9.9 1.9-1.9-.9-1.9.5-1.1 2-.7Z"
+                  />
+                </svg>
+                <span>Custom</span>
+              </button>
             </div>
-            <p id="transcript" class="placeholder">Your words will appear here.</p>
-          </article>
-          <article class="message-card response-card">
-            <div class="message-meta">
-              <span>Vaani</span>
-              <span>AI</span>
+
+            <div class="toolbar-group toolbar-group-right">
+              <button
+                id="speaker-button"
+                class="icon-button"
+                type="button"
+                aria-label="Mute voice responses"
+                aria-pressed="false"
+              >
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                  <path d="M5 10v4h3l5 4V6l-5 4H5Zm11-1.5c1 .9 1.5 2 1.5 3.5S17 14.6 16 15.5" />
+                </svg>
+              </button>
+              <button
+                id="voice-button"
+                class="icon-button"
+                type="button"
+                aria-label="Start conversation"
+              >
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                  <rect x="9" y="3.5" width="6" height="11" rx="3" />
+                  <path d="M6.5 11.5a5.5 5.5 0 0 0 11 0M12 17v3M9 20h6" />
+                </svg>
+                <span id="voice-button-label" class="sr-only">Start conversation</span>
+              </button>
+              <button
+                id="send-button"
+                class="send-button"
+                type="submit"
+                aria-label="Send message"
+                disabled
+              >
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                  <path d="m7 12 5-5 5 5M12 7v10" />
+                </svg>
+              </button>
+              <button
+                id="interrupt-button"
+                class="close-button"
+                type="button"
+                aria-label="Stop response"
+                disabled
+              >
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                  <path d="m7 7 10 10M17 7 7 17" />
+                </svg>
+              </button>
             </div>
-            <p id="response" class="placeholder">The response will appear here.</p>
-          </article>
-        </div>
+          </div>
 
-        <section class="history-panel" aria-label="Conversation history">
-          <div class="section-heading">
-            <span>Conversation history</span>
-            <span id="history-count">0 messages</span>
-          </div>
-          <div id="history" class="history">
-            <p class="history-empty">This conversation is just getting started.</p>
-          </div>
-        </section>
-
-        <form id="text-form" class="text-form">
-          <label for="text-input">Or type a message</label>
-          <div class="text-row">
-            <input
-              id="text-input"
-              name="message"
-              type="text"
-              autocomplete="off"
-              placeholder="Ask Vaani anything…"
-            />
-            <button type="submit">Send</button>
-          </div>
-        </form>
-
-        <form id="upload-form" class="upload-form">
-          <div>
-            <label for="file-input">Give Vaani a file to read</label>
-            <p id="upload-status">Any file type · maximum 5 MB</p>
-          </div>
-          <div class="upload-actions">
-            <input id="file-input" name="file" type="file" />
-            <button id="upload-button" class="secondary-button" type="submit">
-              Upload and read
-            </button>
-          </div>
+          <span id="upload-status" class="upload-status" role="status"></span>
         </form>
       </section>
 
-      <footer>
-        <span>OpenAI reasoning</span>
-        <span>Saaras v3 listening</span>
-        <span>Bulbul v3 speaking</span>
-      </footer>
+      <aside id="settings-panel" class="settings-panel" hidden>
+        <div class="panel-heading">
+          <span>Conversation settings</span>
+          <span id="history-count">0 messages</span>
+        </div>
+        <label>
+          <span>Conversation</span>
+          <select id="session-select" aria-label="Previous conversations">
+            <option value="">Current conversation</option>
+          </select>
+        </label>
+        <label>
+          <span>Input language</span>
+          <select id="language">
+            <option value="unknown">Auto-detect</option>
+            <option value="en-IN">English</option>
+            <option value="hi-IN">हिन्दी</option>
+            <option value="bn-IN">বাংলা</option>
+            <option value="ta-IN">தமிழ்</option>
+            <option value="te-IN">తెలుగు</option>
+            <option value="kn-IN">ಕನ್ನಡ</option>
+            <option value="ml-IN">മലയാളം</option>
+            <option value="mr-IN">मराठी</option>
+            <option value="gu-IN">ગુજરાતી</option>
+            <option value="pa-IN">ਪੰਜਾਬੀ</option>
+          </select>
+        </label>
+        <button id="new-session" class="panel-button" type="button">New conversation</button>
+      </aside>
+
+      <form id="upload-form" class="hidden-upload">
+        <input id="file-input" name="file" type="file" />
+        <button id="upload-button" type="submit">Upload</button>
+      </form>
     </main>
 
     <script type="module" src="/src/main.ts"></script>

@@ -37,24 +37,27 @@ const voiceButton = requiredElement<HTMLButtonElement>("#voice-button");
 const voiceButtonLabel = requiredElement("#voice-button-label");
 const interruptButton = requiredElement<HTMLButtonElement>("#interrupt-button");
 const language = requiredElement<HTMLSelectElement>("#language");
-const transcript = requiredElement("#transcript");
-const response = requiredElement("#response");
-const detectedLanguage = requiredElement("#detected-language");
 const connectionDot = requiredElement("#connection-dot");
 const connectionLabel = requiredElement("#connection-label");
 const orb = requiredElement<HTMLElement>("#orb");
 const stateLabel = requiredElement("#state-label");
 const stateDetail = requiredElement("#state-detail");
 const textForm = requiredElement<HTMLFormElement>("#text-form");
-const textInput = requiredElement<HTMLInputElement>("#text-input");
+const textInput = requiredElement<HTMLTextAreaElement>("#text-input");
 const sessionSelect = requiredElement<HTMLSelectElement>("#session-select");
 const newSessionButton = requiredElement<HTMLButtonElement>("#new-session");
 const history = requiredElement("#history");
 const historyCount = requiredElement("#history-count");
+const conversationView = requiredElement<HTMLElement>(".conversation-view");
 const uploadForm = requiredElement<HTMLFormElement>("#upload-form");
 const fileInput = requiredElement<HTMLInputElement>("#file-input");
 const uploadButton = requiredElement<HTMLButtonElement>("#upload-button");
 const uploadStatus = requiredElement("#upload-status");
+const addButton = requiredElement<HTMLButtonElement>("#add-button");
+const settingsButton = requiredElement<HTMLButtonElement>("#settings-button");
+const settingsPanel = requiredElement<HTMLElement>("#settings-panel");
+const speakerButton = requiredElement<HTMLButtonElement>("#speaker-button");
+const sendButton = requiredElement<HTMLButtonElement>("#send-button");
 
 let socket: WebSocket | undefined;
 let mediaStream: MediaStream | undefined;
@@ -67,6 +70,14 @@ let historyMessages: ConversationMessage[] = [];
 let recording = false;
 let responseText = "";
 let ttsEnded = false;
+let muted = false;
+let pendingUserEcho: string | undefined;
+let activeAssistant:
+  | {
+      item: HTMLElement;
+      text: HTMLParagraphElement;
+    }
+  | undefined;
 const audioQueue: Array<{ audio: string; mimeType: string }> = [];
 
 const stateCopy: Record<string, [string, string]> = {
@@ -88,9 +99,30 @@ function setState(state: string): void {
   interruptButton.disabled = !["speaking", "thinking", "tool"].includes(state);
 }
 
-function setText(element: Element, text: string): void {
-  element.textContent = text;
-  element.classList.toggle("placeholder", !text);
+function createMessage(message: ConversationMessage): HTMLElement {
+  const item = document.createElement("article");
+  item.className = `history-message ${message.role}`;
+  const role = document.createElement("span");
+  role.textContent = message.role === "user" ? "You" : "Vaani";
+  const text = document.createElement("p");
+  text.textContent = message.text;
+  item.append(role, text);
+  return item;
+}
+
+function updateHistoryCount(): void {
+  const count = historyMessages.length;
+  historyCount.textContent = `${count} ${count === 1 ? "message" : "messages"}`;
+}
+
+function scrollToLatest(): void {
+  window.requestAnimationFrame(() => {
+    conversationView.scrollTop = conversationView.scrollHeight;
+  });
+}
+
+function removeEmptyHistory(): void {
+  history.querySelector(".history-empty")?.remove();
 }
 
 function send(message: object): void {
@@ -122,6 +154,7 @@ async function parseJsonResponse<T>(response: Response): Promise<T> {
 
 function renderHistory(messages: ConversationMessage[]): void {
   historyMessages = [...messages];
+  activeAssistant = undefined;
   history.replaceChildren();
 
   if (messages.length === 0) {
@@ -131,23 +164,55 @@ function renderHistory(messages: ConversationMessage[]): void {
     history.append(empty);
   } else {
     for (const message of messages) {
-      const item = document.createElement("article");
-      item.className = `history-message ${message.role}`;
-      const role = document.createElement("span");
-      role.textContent = message.role === "user" ? "You" : "Vaani";
-      const text = document.createElement("p");
-      text.textContent = message.text;
-      item.append(role, text);
-      history.append(item);
+      history.append(createMessage(message));
     }
   }
 
-  historyCount.textContent = `${messages.length} ${messages.length === 1 ? "message" : "messages"}`;
-  history.scrollTop = history.scrollHeight;
+  updateHistoryCount();
+  scrollToLatest();
 }
 
 function appendHistory(message: ConversationMessage): void {
-  renderHistory([...historyMessages, message]);
+  removeEmptyHistory();
+  historyMessages.push(message);
+  history.append(createMessage(message));
+  updateHistoryCount();
+  scrollToLatest();
+}
+
+function startAssistantMessage(): void {
+  if (activeAssistant) return;
+  removeEmptyHistory();
+  const item = createMessage({ role: "assistant", text: "" });
+  item.classList.add("streaming");
+  const text = item.querySelector("p");
+  if (!text) throw new Error("Assistant message is missing its text element");
+  history.append(item);
+  activeAssistant = { item, text };
+  scrollToLatest();
+}
+
+function streamAssistantMessage(text: string): void {
+  if (!activeAssistant) startAssistantMessage();
+  if (!activeAssistant) return;
+  activeAssistant.text.textContent = text;
+  scrollToLatest();
+}
+
+function commitAssistantMessage(text: string): void {
+  if (!activeAssistant && text) startAssistantMessage();
+  if (!activeAssistant) return;
+
+  if (!text) {
+    activeAssistant.item.remove();
+  } else {
+    activeAssistant.text.textContent = text;
+    activeAssistant.item.classList.remove("streaming");
+    historyMessages.push({ role: "assistant", text });
+  }
+  activeAssistant = undefined;
+  updateHistoryCount();
+  scrollToLatest();
 }
 
 async function refreshSessions(): Promise<void> {
@@ -200,6 +265,7 @@ function playNext(): void {
   const url = URL.createObjectURL(new Blob([bytes], { type: item.mimeType }));
   const player = new Audio(url);
   currentAudio = player;
+  player.muted = muted;
   const finish = () => {
     URL.revokeObjectURL(url);
     if (currentAudio === player) currentAudio = undefined;
@@ -220,9 +286,8 @@ function handleMessage(message: ServerMessage): void {
     activeSessionId = message.id;
     window.localStorage.setItem("vaani-session", message.id);
     renderHistory(message.history);
-    setText(transcript, "");
-    setText(response, "");
-    detectedLanguage.textContent = "—";
+    pendingUserEcho = undefined;
+    responseText = "";
     uploadButton.disabled = false;
     void refreshSessions().catch(() => undefined);
     return;
@@ -232,25 +297,29 @@ function handleMessage(message: ServerMessage): void {
     return;
   }
   if (message.type === "transcript") {
-    setText(transcript, message.text);
-    detectedLanguage.textContent = message.language;
+    commitAssistantMessage(responseText);
+    responseText = "";
+    if (pendingUserEcho === message.text) {
+      pendingUserEcho = undefined;
+      return;
+    }
     appendHistory({ role: "user", text: message.text });
     return;
   }
   if (message.type === "assistant_start") {
     responseText = "";
-    setText(response, "");
+    startAssistantMessage();
     return;
   }
   if (message.type === "assistant_delta") {
     responseText += message.text;
-    setText(response, responseText);
+    streamAssistantMessage(responseText);
     return;
   }
   if (message.type === "assistant_end") {
     const text = message.text || responseText;
-    setText(response, text);
-    if (text) appendHistory({ role: "assistant", text });
+    commitAssistantMessage(text);
+    responseText = "";
     void refreshSessions().catch(() => undefined);
     return;
   }
@@ -329,6 +398,7 @@ async function startRecording(): Promise<void> {
   recording = true;
   voiceButton.classList.add("active");
   voiceButtonLabel.textContent = "Stop conversation";
+  voiceButton.setAttribute("aria-label", "Stop conversation");
   language.disabled = true;
   send({ type: "start", language: language.value });
 }
@@ -346,6 +416,7 @@ async function stopRecording(): Promise<void> {
   workletNode = undefined;
   voiceButton.classList.remove("active");
   voiceButtonLabel.textContent = "Start conversation";
+  voiceButton.setAttribute("aria-label", "Start conversation");
   language.disabled = false;
 }
 
@@ -358,6 +429,8 @@ voiceButton.addEventListener("click", () => {
 
 interruptButton.addEventListener("click", () => {
   cancelAudio();
+  commitAssistantMessage(responseText);
+  responseText = "";
   interruptButton.disabled = true;
   send({ type: "cancel" });
   setState(recording ? "listening" : "idle");
@@ -367,8 +440,62 @@ textForm.addEventListener("submit", (event) => {
   event.preventDefault();
   const text = textInput.value.trim();
   if (!text) return;
+  commitAssistantMessage(responseText);
+  responseText = "";
+  appendHistory({ role: "user", text });
+  pendingUserEcho = text;
   send({ type: "text", text });
   textInput.value = "";
+  sendButton.disabled = true;
+});
+
+textInput.addEventListener("input", () => {
+  sendButton.disabled = !textInput.value.trim();
+  textInput.style.height = "auto";
+  textInput.style.height = `${Math.min(textInput.scrollHeight, 96)}px`;
+});
+
+textInput.addEventListener("keydown", (event) => {
+  if (event.key === "Enter" && !event.shiftKey) {
+    event.preventDefault();
+    textForm.requestSubmit();
+  }
+});
+
+addButton.addEventListener("click", () => fileInput.click());
+
+fileInput.addEventListener("change", () => {
+  if (fileInput.files?.length) uploadForm.requestSubmit();
+});
+
+settingsButton.addEventListener("click", () => {
+  const willOpen = settingsPanel.hidden;
+  settingsPanel.hidden = !willOpen;
+  settingsButton.setAttribute("aria-expanded", String(willOpen));
+});
+
+document.addEventListener("click", (event) => {
+  const target = event.target;
+  if (
+    !settingsPanel.hidden &&
+    target instanceof Node &&
+    !settingsPanel.contains(target) &&
+    !settingsButton.contains(target)
+  ) {
+    settingsPanel.hidden = true;
+    settingsButton.setAttribute("aria-expanded", "false");
+  }
+});
+
+speakerButton.addEventListener("click", () => {
+  muted = !muted;
+  if (currentAudio) currentAudio.muted = muted;
+  speakerButton.classList.toggle("active", muted);
+  speakerButton.setAttribute("aria-pressed", String(muted));
+  speakerButton.setAttribute(
+    "aria-label",
+    muted ? "Unmute voice responses" : "Mute voice responses",
+  );
 });
 
 sessionSelect.addEventListener("change", () => {

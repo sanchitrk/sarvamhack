@@ -4,21 +4,12 @@ A pnpm and TypeScript monorepo powered by Vite Plus.
 
 ## Workspace
 
-- `packages/core` — Pi-powered agent loop with OpenAI
+- `packages/core` — Agent loop
 - `apps/voice` — Hono server and browser voice client with Sarvam STT/TTS
 
 ## Layer 1 agent
 
 Create `packages/core/.env.local`:
-
-```sh
-OPENAI_API_KEY=...
-PI_PROVIDER=openai
-PI_MODEL=gpt-5.4-mini
-```
-
-`PI_PROVIDER` and `PI_MODEL` are optional; the values above are the current
-defaults.
 
 Start an interactive, stateful terminal session:
 

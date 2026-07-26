@@ -12,8 +12,18 @@
   },
   "scripts": {
     "build": "vp pack src/index.ts",
+    "chat": "node --env-file=.env.local --experimental-strip-types src/demo.ts",
     "check": "vp check",
     "dev": "vp pack src/index.ts --watch",
-    "test": "vp test run"
+    "smoke": "node --env-file=.env.local --experimental-strip-types src/smoke.ts",
+    "test": "vp test run",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@earendil-works/pi-agent-core": "catalog:",
+    "@earendil-works/pi-ai": "catalog:"
+  },
+  "devDependencies": {
+    "@types/node": "catalog:"
   }
 }

@@ -4,7 +4,9 @@ export interface AgentConfig {
   apiKey: string;
   sarvamApiKey?: string;
   systemPrompt: string;
-  toolNames?: Array<"read" | "grep" | "find" | "ls" | "document_intelligence">;
+  toolNames?: Array<
+    "read" | "grep" | "find" | "ls" | "bash" | "document_intelligence" | "split_pdf"
+  >;
   cwd?: string;
 }
 

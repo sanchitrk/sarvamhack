@@ -77,7 +77,11 @@ locally under `apps/voice/.data/` and are not committed.
 
 The UI accepts any file type up to 5 MB. Sarvam Document Intelligence supports
 documents up to 10 pages in PDF, PNG, JPEG, or ZIP form; other readable text and
-source files continue through Pi's local file tools.
+source files continue through Pi's local file tools. Oversized PDFs are split
+into ordered, 10-page parts with Poppler and each part is submitted to Document
+Intelligence before Sia combines the results. Sia can also use Poppler through
+its Bash tool to inspect, split, merge, render, or extract text from workspace
+PDFs.
 
 ## Commands
 

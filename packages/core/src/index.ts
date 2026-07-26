@@ -17,6 +17,8 @@ export {
   DOCUMENT_INTELLIGENCE_TOOL_NAME,
 } from "./tools/document.ts";
 export type { DigitizedDocument, DigitizeDocumentOptions } from "./tools/document.ts";
+export { createPdfSplitTool, PDF_SPLIT_TOOL_NAME, splitPdf } from "./tools/pdf.ts";
+export type { SplitPdfOptions, SplitPdfResult } from "./tools/pdf.ts";
 export type {
   AgentConfig,
   AgentEvent,

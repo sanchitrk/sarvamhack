@@ -28,6 +28,7 @@ import {
   createDocumentIntelligenceTool,
   DOCUMENT_INTELLIGENCE_TOOL_NAME,
 } from "./tools/document.ts";
+import { createPdfSplitTool, PDF_SPLIT_TOOL_NAME } from "./tools/pdf.ts";
 import type {
   AgentConfig,
   AgentEvent,
@@ -325,11 +326,14 @@ export async function createAgent(
   const documentTools = config.sarvamApiKey
     ? [createDocumentIntelligenceTool({ apiKey: config.sarvamApiKey })]
     : [];
+  const customTools = [createPdfSplitTool(), ...documentTools];
   const defaultTools = [
     "read",
     "grep",
     "find",
     "ls",
+    "bash",
+    PDF_SPLIT_TOOL_NAME,
     ...(documentTools.length > 0 ? [DOCUMENT_INTELLIGENCE_TOOL_NAME] : []),
   ];
   let requestedSessionId = options.sessionId;
@@ -361,11 +365,26 @@ export async function createAgent(
       noThemes: true,
       systemPrompt: `${config.systemPrompt}
 
-You can inspect files in the current workspace with read, grep, find, and ls.
+You can inspect files in the current workspace with read, grep, find, and ls. Use bash for workspace PDF operations.
 When the user uploads or asks about a file, inspect it with the appropriate tool before answering.
 
 Tools:
 Use document_intelligence for PDFs, scans, document images, and ZIP archives of page images.
+If a PDF exceeds Document Intelligence's 10-page or 200 MB limit, use split_pdf first. Submit every returned part to document_intelligence in order, then combine the results.
+For PDFs over 200 MB, split_pdf automatically defaults to single-page parts.
+Use split_pdf only for PDFs that exceed or are rejected because of those limits.
+
+Poppler commands available through bash:
+- Inspect metadata and page count: pdfinfo "$INPUT_PDF"
+- Split into pages: pdfseparate "$INPUT_PDF" "page-%d.pdf"
+- Merge ordered PDFs: pdfunite "$PART_1" "$PART_2" "$OUTPUT_PDF"
+- Extract text: pdftotext "$INPUT_PDF" -
+- Render pages to PNG: pdftoppm -png "$INPUT_PDF" "$OUTPUT_PREFIX"
+- Render through Cairo: pdftocairo -pdf "$INPUT_PDF" "$OUTPUT_PDF"
+- Remove known user-password encryption: pdftocairo -pdf -upw "$PASSWORD" "$INPUT_PDF" "$OUTPUT_PDF"
+- Remove known owner-password encryption: pdftocairo -pdf -opw "$PASSWORD" "$INPUT_PDF" "$OUTPUT_PDF"
+Quote every file path. Keep inputs and outputs inside the workspace. Only remove PDF encryption when the user supplies the password and is authorized to modify the file. Never guess, crack, or bypass an unknown password. Warn that rewriting an encrypted PDF can invalidate digital signatures and may not preserve interactive forms, bookmarks, or annotations.
+
 Never claim to have read a file unless a tool successfully returned its contents.
 If a tool cannot decode the format, explain that limitation clearly.`,
     });
@@ -384,7 +403,7 @@ If a tool cannot decode the format, explain that limitation clearly.`,
         retry: { enabled: true, maxRetries: 2 },
       }),
       tools: config.toolNames || defaultTools,
-      customTools: documentTools,
+      customTools,
     });
 
     return {

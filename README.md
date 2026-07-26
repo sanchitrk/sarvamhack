@@ -28,7 +28,6 @@ pnpm --filter @sarvamhack/core smoke
 Add both keys to `packages/core/.env.local`:
 
 ```sh
-OPENAI_API_KEY=...
 SARVAM_API_KEY=...
 ```
 

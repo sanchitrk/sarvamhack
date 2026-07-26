@@ -72,7 +72,7 @@ type ClientMessage =
   | { type: "playback_done" }
   | { type: "new_session" }
   | { type: "open_session"; sessionId: string }
-  | { type: "file"; name: string };
+  | { type: "file"; path: string };
 
 interface SarvamMessage {
   type?: unknown;
@@ -116,8 +116,8 @@ function parseClientMessage(value: string): ClientMessage | undefined {
     if (type === "open_session" && "sessionId" in parsed && typeof parsed.sessionId === "string") {
       return { type, sessionId: parsed.sessionId };
     }
-    if (type === "file" && "name" in parsed && typeof parsed.name === "string") {
-      return { type, name: parsed.name };
+    if (type === "file" && "path" in parsed && typeof parsed.path === "string") {
+      return { type, path: parsed.path };
     }
     return undefined;
   } catch {
@@ -288,22 +288,22 @@ class VoiceSession {
       return;
     }
     if (message.type === "file") {
-      let name: string;
+      let relativePath: string;
       try {
-        name = uploadName(message.name);
+        relativePath = uploadName(message.path);
       } catch (error) {
         this.fail(error instanceof Error ? error.message : String(error));
         return;
       }
       const workspace = workspacePath(workspacesDir, this.agent.sessionId);
       try {
-        await access(join(workspace, name));
+        await access(join(workspace, relativePath));
       } catch {
         this.fail("Uploaded file not found");
         return;
       }
       await this.submitTranscript(
-        `I uploaded "${name}". Read it with your file tools and briefly explain its contents.`,
+        `I uploaded a file at "./${relativePath}" in your current workspace. Read that path with your file tools and briefly explain its contents.`,
         this.language,
       );
       return;
@@ -561,21 +561,24 @@ app.post("/api/sessions/:sessionId/files", async (context) => {
     return context.json({ error: "Conversation not found" }, 404);
   }
 
-  const body = await context.req.parseBody();
-  const file = body.file;
-  if (!(file instanceof File)) return context.json({ error: "A file is required" }, 400);
-  if (file.size > maxUploadBytes) {
-    return context.json({ error: "File exceeds the 5 MB limit" }, 413);
-  }
-
   try {
+    const body = await context.req.parseBody();
+    const file = body.file;
+    if (!(file instanceof File)) return context.json({ error: "A file is required" }, 400);
+    if (file.size > maxUploadBytes) {
+      return context.json({ error: "File exceeds the 5 MB limit" }, 413);
+    }
+
     const name = await storeUpload(
       workspacesDir,
       sessionId,
       file.name,
       new Uint8Array(await file.arrayBuffer()),
     );
-    return context.json({ name });
+    return context.json({
+      name,
+      path: name,
+    });
   } catch (error) {
     return context.json({ error: error instanceof Error ? error.message : String(error) }, 400);
   }

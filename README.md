@@ -69,8 +69,9 @@ Upload a supported text or source file from the UI and Vaani will inspect it
 with Pi's read-only `read`, `grep`, `find`, and `ls` tools. Uploads and session
 JSONL files are stored locally under `apps/voice/.data/` and are not committed.
 
-Supported uploads include text, Markdown, CSV, JSON, YAML, XML, HTML, CSS, and
-common source-code files up to 5 MB.
+The UI accepts any file type up to 5 MB. Pi's tools decide whether the format is
+readable; when it is not, the agent reports that limitation instead of the
+upload being rejected.
 
 ## Commands
 

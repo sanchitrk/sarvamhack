@@ -3,29 +3,6 @@ import { basename, extname, join } from "node:path";
 
 export const maxUploadBytes = 5 * 1024 * 1024;
 
-const allowedExtensions = new Set([
-  ".css",
-  ".csv",
-  ".go",
-  ".htm",
-  ".html",
-  ".java",
-  ".js",
-  ".json",
-  ".jsx",
-  ".md",
-  ".py",
-  ".rs",
-  ".sql",
-  ".text",
-  ".ts",
-  ".tsx",
-  ".txt",
-  ".xml",
-  ".yaml",
-  ".yml",
-]);
-
 export function isSessionId(value: string): boolean {
   return /^[A-Za-z0-9](?:[A-Za-z0-9._-]*[A-Za-z0-9])?$/.test(value);
 }
@@ -33,16 +10,12 @@ export function isSessionId(value: string): boolean {
 export function uploadName(value: string): string {
   const original = basename(value).normalize("NFKC");
   const extension = extname(original).toLowerCase();
-  if (!allowedExtensions.has(extension)) {
-    throw new Error(`Unsupported file type "${extension || "unknown"}"`);
-  }
-
-  const stem = original
-    .slice(0, -extension.length)
+  const stem = (extension ? original.slice(0, -extension.length) : original)
     .replace(/[^\p{L}\p{N}._-]+/gu, "-")
     .replace(/^[._-]+|[._-]+$/g, "")
     .slice(0, 90);
-  return `${stem || "upload"}${extension}`;
+  const safeExtension = extension.replace(/[^\p{L}\p{N}._-]+/gu, "").slice(0, 24);
+  return `${stem || "upload"}${safeExtension}`;
 }
 
 export function workspacePath(workspacesDir: string, sessionId: string): string {
@@ -62,7 +35,7 @@ export async function storeUpload(
   await mkdir(workspace, { recursive: true });
   const safeName = uploadName(originalName);
   const extension = extname(safeName);
-  const stem = safeName.slice(0, -extension.length);
+  const stem = extension ? safeName.slice(0, -extension.length) : safeName;
   let candidate = safeName;
 
   for (let index = 2; ; index += 1) {

@@ -349,7 +349,8 @@ export async function createAgent(
 
 You can inspect files in the current workspace with read, grep, find, and ls.
 When the user uploads or asks about a file, use those tools before answering.
-Never claim to have read a file unless a tool successfully returned its contents.`,
+Never claim to have read a file unless a tool successfully returned its contents.
+If a tool cannot decode the format, explain that limitation clearly.`,
     });
     await resourceLoader.reload();
 

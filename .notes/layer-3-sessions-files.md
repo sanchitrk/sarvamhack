@@ -70,21 +70,18 @@ mutation or arbitrary command execution.
 5. Selecting an older conversation reopens its Pi JSONL session.
 6. Upload uses `multipart/form-data` with the active session ID.
 7. The server stores a sanitized filename inside that session workspace.
-8. The browser sends a `file` control message.
-9. The agent is prompted to inspect that relative path with its `read` tool.
+8. The upload API returns the sanitized path relative to the session workspace.
+9. The browser sends that path in a `file` control message.
+10. The agent core is prompted to inspect that exact relative path with its
+    `read` tool.
 
 ## Initial File Scope
 
-Support UTF-8 text and source files up to 5 MB:
-
-- text, Markdown, CSV, JSON
-- YAML and XML
-- JavaScript and TypeScript
-- Python, Java, Go, Rust, and SQL
-- HTML and CSS
-
-Binary documents and extraction for PDF, DOCX, audio, and video are separate
-work because they require format-specific parsing.
+Accept any file type up to 5 MB. The upload layer sanitizes the filename and
+stores the bytes without trying to determine whether the content is readable.
+Pi's file tools make that decision. The agent should explain a tool error when a
+binary or specialized format cannot be decoded rather than the server rejecting
+the upload.
 
 Set `VOICE_DATA_DIR` to override the runtime data directory, which is useful for
 isolated smoke tests.

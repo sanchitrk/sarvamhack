@@ -106,6 +106,18 @@ function parseMessage(value: string): ServerMessage | undefined {
   }
 }
 
+async function parseJsonResponse<T>(response: Response): Promise<T> {
+  const text = await response.text();
+  if (!text) {
+    throw new Error(`Server returned an empty response (${response.status})`);
+  }
+  try {
+    return JSON.parse(text) as T;
+  } catch {
+    throw new Error(`Server returned an invalid response (${response.status})`);
+  }
+}
+
 function renderHistory(messages: ConversationMessage[]): void {
   historyMessages = [...messages];
   history.replaceChildren();
@@ -139,7 +151,7 @@ function appendHistory(message: ConversationMessage): void {
 async function refreshSessions(): Promise<void> {
   const response = await fetch("/api/sessions");
   if (!response.ok) throw new Error("Could not load conversations");
-  const payload = (await response.json()) as { sessions: SessionSummary[] };
+  const payload = await parseJsonResponse<{ sessions: SessionSummary[] }>(response);
   sessionSelect.replaceChildren();
 
   if (activeSessionId && !payload.sessions.some((session) => session.id === activeSessionId)) {
@@ -379,12 +391,16 @@ uploadForm.addEventListener("submit", (event) => {
       method: "POST",
       body,
     });
-    const payload = (await result.json()) as { name?: string; error?: string };
-    if (!result.ok || !payload.name) throw new Error(payload.error || "Upload failed");
+    const payload = await parseJsonResponse<{ name?: string; path?: string; error?: string }>(
+      result,
+    );
+    if (!result.ok || !payload.name || !payload.path) {
+      throw new Error(payload.error || "Upload failed");
+    }
 
     uploadStatus.textContent = `${payload.name} uploaded. Vaani is reading it now.`;
     fileInput.value = "";
-    send({ type: "file", name: payload.name });
+    send({ type: "file", path: payload.path });
   })()
     .catch((error: unknown) => {
       uploadStatus.textContent = error instanceof Error ? error.message : String(error);

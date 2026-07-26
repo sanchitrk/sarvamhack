@@ -1,0 +1,28 @@
+{
+  "name": "@sarvamhack/voice",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "vite build",
+    "dev": "concurrently -k -n server,web \"pnpm dev:server\" \"pnpm dev:web\"",
+    "dev:server": "tsx watch src/server.ts",
+    "dev:web": "vite",
+    "start": "tsx src/server.ts",
+    "test": "vp test run --config vitest.config.ts",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@hono/node-server": "catalog:",
+    "hono": "catalog:",
+    "ws": "catalog:"
+  },
+  "devDependencies": {
+    "@types/node": "catalog:",
+    "@types/ws": "catalog:",
+    "concurrently": "catalog:",
+    "tsx": "catalog:",
+    "typescript": "catalog:",
+    "vite": "catalog:"
+  }
+}

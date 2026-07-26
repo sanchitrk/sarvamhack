@@ -6,6 +6,7 @@
   "scripts": {
     "build": "vp run -r build",
     "check": "vp check",
+    "dev": "pnpm --filter @sarvamhack/voice dev",
     "ready": "vp check && vp run -r test && vp run -r build",
     "test": "vp run -r test",
     "typecheck": "vp run -r typecheck"

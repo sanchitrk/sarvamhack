@@ -1,0 +1,116 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta
+      name="description"
+      content="A multilingual voice agent powered by Sarvam speech and Pi."
+    />
+    <title>Vaani — Voice Agent</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600&family=Manrope:wght@600;700;800&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="/src/style.css" />
+  </head>
+  <body>
+    <main class="shell">
+      <nav>
+        <a class="brand" href="/" aria-label="Vaani home">
+          <span class="brand-mark" aria-hidden="true"></span>
+          Vaani
+        </a>
+        <div class="connection">
+          <span id="connection-dot" class="connection-dot"></span>
+          <span id="connection-label">Connecting</span>
+        </div>
+      </nav>
+
+      <section class="hero">
+        <div class="eyebrow">Sarvam × Pi</div>
+        <h1>Speak naturally.<br /><span>Vaani listens.</span></h1>
+        <p>
+          A multilingual voice agent that understands Indian speech and responds with a natural
+          voice.
+        </p>
+      </section>
+
+      <section class="conversation" aria-live="polite">
+        <div class="voice-stage">
+          <div id="orb" class="orb" data-state="idle" aria-hidden="true">
+            <div class="orb-core"></div>
+            <div class="orb-ring orb-ring-one"></div>
+            <div class="orb-ring orb-ring-two"></div>
+          </div>
+          <div id="state-label" class="state-label">Ready when you are</div>
+          <div id="state-detail" class="state-detail">Press start and allow microphone access</div>
+        </div>
+
+        <div class="controls">
+          <label class="language-control">
+            <span>Input language</span>
+            <select id="language">
+              <option value="unknown">Auto-detect</option>
+              <option value="en-IN">English</option>
+              <option value="hi-IN">हिन्दी</option>
+              <option value="bn-IN">বাংলা</option>
+              <option value="ta-IN">தமிழ்</option>
+              <option value="te-IN">తెలుగు</option>
+              <option value="kn-IN">ಕನ್ನಡ</option>
+              <option value="ml-IN">മലയാളം</option>
+              <option value="mr-IN">मराठी</option>
+              <option value="gu-IN">ગુજરાતી</option>
+              <option value="pa-IN">ਪੰਜਾਬੀ</option>
+            </select>
+          </label>
+          <button id="voice-button" class="voice-button" type="button">
+            <span class="mic" aria-hidden="true"></span>
+            <span id="voice-button-label">Start conversation</span>
+          </button>
+        </div>
+
+        <div class="transcript-grid">
+          <article class="message-card">
+            <div class="message-meta">
+              <span>You</span>
+              <span id="detected-language">—</span>
+            </div>
+            <p id="transcript" class="placeholder">Your words will appear here.</p>
+          </article>
+          <article class="message-card response-card">
+            <div class="message-meta">
+              <span>Vaani</span>
+              <span>AI</span>
+            </div>
+            <p id="response" class="placeholder">The response will appear here.</p>
+          </article>
+        </div>
+
+        <form id="text-form" class="text-form">
+          <label for="text-input">Or type a message</label>
+          <div class="text-row">
+            <input
+              id="text-input"
+              name="message"
+              type="text"
+              autocomplete="off"
+              placeholder="Ask Vaani anything…"
+            />
+            <button type="submit">Send</button>
+          </div>
+        </form>
+      </section>
+
+      <footer>
+        <span>OpenAI reasoning</span>
+        <span>Saaras v3 listening</span>
+        <span>Bulbul v3 speaking</span>
+      </footer>
+    </main>
+
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

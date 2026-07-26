@@ -34,6 +34,7 @@ function requiredElement<T extends Element>(selector: string): T {
 }
 
 const voiceButton = requiredElement<HTMLButtonElement>("#voice-button");
+const appShell = requiredElement<HTMLElement>(".app-shell");
 const voiceButtonLabel = requiredElement("#voice-button-label");
 const interruptButton = requiredElement<HTMLButtonElement>("#interrupt-button");
 const language = requiredElement<HTMLSelectElement>("#language");
@@ -45,7 +46,12 @@ const stateDetail = requiredElement("#state-detail");
 const textForm = requiredElement<HTMLFormElement>("#text-form");
 const textInput = requiredElement<HTMLTextAreaElement>("#text-input");
 const sessionSelect = requiredElement<HTMLSelectElement>("#session-select");
+const sessionList = requiredElement<HTMLElement>("#session-list");
 const newSessionButton = requiredElement<HTMLButtonElement>("#new-session");
+const sidebar = requiredElement<HTMLElement>("#sidebar");
+const sidebarOpenButton = requiredElement<HTMLButtonElement>("#sidebar-open");
+const sidebarToggleButton = requiredElement<HTMLButtonElement>("#sidebar-toggle");
+const sidebarBackdrop = requiredElement<HTMLButtonElement>("#sidebar-backdrop");
 const history = requiredElement("#history");
 const historyCount = requiredElement("#history-count");
 const conversationView = requiredElement<HTMLElement>(".conversation-view");
@@ -215,28 +221,84 @@ function commitAssistantMessage(text: string): void {
   scrollToLatest();
 }
 
+function sessionTitle(session: SessionSummary): string {
+  return session.firstMessage === "(no messages)"
+    ? "New conversation"
+    : session.firstMessage.replace(/\s+/g, " ").slice(0, 46);
+}
+
+function sessionDate(modified: string): string {
+  const date = new Date(modified);
+  if (Number.isNaN(date.getTime())) return "";
+  const today = new Date();
+  if (date.toDateString() === today.toDateString()) {
+    return date.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+  }
+  return date.toLocaleDateString([], { month: "short", day: "numeric" });
+}
+
+function closeSidebarOnMobile(): void {
+  sidebar.classList.remove("open");
+  sidebarBackdrop.classList.remove("visible");
+  sidebarOpenButton.setAttribute("aria-expanded", "false");
+}
+
+function openSession(sessionId: string): void {
+  closeSidebarOnMobile();
+  if (!sessionId || sessionId === activeSessionId) return;
+  cancelAudio();
+  commitAssistantMessage(responseText);
+  responseText = "";
+  setState("connecting");
+  send({ type: "open_session", sessionId });
+}
+
 async function refreshSessions(): Promise<void> {
   const response = await fetch("/api/sessions");
   if (!response.ok) throw new Error("Could not load conversations");
   const payload = await parseJsonResponse<{ sessions: SessionSummary[] }>(response);
   sessionSelect.replaceChildren();
+  sessionList.replaceChildren();
 
   if (activeSessionId && !payload.sessions.some((session) => session.id === activeSessionId)) {
-    const current = document.createElement("option");
-    current.value = activeSessionId;
-    current.textContent = "New conversation";
-    sessionSelect.append(current);
+    payload.sessions.unshift({
+      id: activeSessionId,
+      firstMessage: "(no messages)",
+      modified: new Date().toISOString(),
+    });
   }
 
   for (const session of payload.sessions) {
+    const title = sessionTitle(session);
     const option = document.createElement("option");
     option.value = session.id;
-    const title =
-      session.firstMessage === "(no messages)"
-        ? "New conversation"
-        : session.firstMessage.replace(/\s+/g, " ").slice(0, 54);
     option.textContent = title;
     sessionSelect.append(option);
+
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "session-item";
+    button.dataset.sessionId = session.id;
+    button.title = title;
+    if (session.id === activeSessionId) {
+      button.classList.add("active");
+      button.setAttribute("aria-current", "page");
+    }
+
+    const marker = document.createElement("span");
+    marker.className = "session-marker";
+    marker.setAttribute("aria-hidden", "true");
+    const copy = document.createElement("span");
+    copy.className = "session-copy sidebar-label";
+    const name = document.createElement("span");
+    name.className = "session-title";
+    name.textContent = title;
+    const modified = document.createElement("span");
+    modified.className = "session-date";
+    modified.textContent = sessionDate(session.modified);
+    copy.append(name, modified);
+    button.append(marker, copy);
+    sessionList.append(button);
   }
   sessionSelect.value = activeSessionId;
 }
@@ -499,17 +561,50 @@ speakerButton.addEventListener("click", () => {
 });
 
 sessionSelect.addEventListener("change", () => {
-  const sessionId = sessionSelect.value;
-  if (!sessionId || sessionId === activeSessionId) return;
-  cancelAudio();
-  setState("connecting");
-  send({ type: "open_session", sessionId });
+  openSession(sessionSelect.value);
+});
+
+sessionList.addEventListener("click", (event) => {
+  const target = event.target;
+  if (!(target instanceof Element)) return;
+  const button = target.closest<HTMLButtonElement>(".session-item");
+  if (button?.dataset.sessionId) openSession(button.dataset.sessionId);
 });
 
 newSessionButton.addEventListener("click", () => {
+  closeSidebarOnMobile();
   cancelAudio();
+  commitAssistantMessage(responseText);
+  responseText = "";
   setState("connecting");
   send({ type: "new_session" });
+});
+
+sidebarOpenButton.addEventListener("click", () => {
+  sidebar.classList.add("open");
+  sidebarBackdrop.classList.add("visible");
+  sidebarOpenButton.setAttribute("aria-expanded", "true");
+});
+
+sidebarToggleButton.addEventListener("click", () => {
+  if (window.matchMedia("(max-width: 860px)").matches) {
+    closeSidebarOnMobile();
+    return;
+  }
+  const collapsed = !appShell.classList.contains("sidebar-collapsed");
+  appShell.classList.toggle("sidebar-collapsed", collapsed);
+  sidebarToggleButton.setAttribute("aria-expanded", String(!collapsed));
+  sidebarToggleButton.setAttribute(
+    "aria-label",
+    collapsed ? "Expand conversations" : "Collapse conversations",
+  );
+  window.localStorage.setItem("vaani-sidebar-collapsed", String(collapsed));
+});
+
+sidebarBackdrop.addEventListener("click", closeSidebarOnMobile);
+
+document.addEventListener("keydown", (event) => {
+  if (event.key === "Escape") closeSidebarOnMobile();
 });
 
 uploadForm.addEventListener("submit", (event) => {
@@ -552,4 +647,11 @@ window.addEventListener("beforeunload", () => {
 });
 
 uploadButton.disabled = !activeSessionId;
+const sidebarStartsCollapsed = window.localStorage.getItem("vaani-sidebar-collapsed") === "true";
+appShell.classList.toggle("sidebar-collapsed", sidebarStartsCollapsed);
+sidebarToggleButton.setAttribute("aria-expanded", String(!sidebarStartsCollapsed));
+sidebarToggleButton.setAttribute(
+  "aria-label",
+  sidebarStartsCollapsed ? "Expand conversations" : "Collapse conversations",
+);
 connect();

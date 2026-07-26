@@ -26,7 +26,7 @@ export function readAgentConfig(environment: NodeJS.ProcessEnv = process.env): A
   const provider = environment.PI_PROVIDER?.trim() || "openai";
   if (provider !== "openai") {
     throw new AgentConfigError(
-      `Unsupported PI_PROVIDER "${provider}"; Layer 1 supports only "openai"`,
+      `Unsupported LLM Provider "${provider}""`,
     );
   }
 

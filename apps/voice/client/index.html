@@ -18,13 +18,69 @@
   </head>
   <body>
     <main class="app-shell">
-      <header class="topbar">
-        <span class="brand" aria-label="Vaani">Vaani</span>
-        <div class="connection" title="Voice server status">
-          <span id="connection-dot" class="connection-dot"></span>
-          <span id="connection-label">Connecting</span>
+      <button
+        id="sidebar-open"
+        class="sidebar-open"
+        type="button"
+        aria-label="Open conversations"
+        aria-controls="sidebar"
+        aria-expanded="false"
+      >
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M4 5h16M4 12h16M4 19h16" />
+        </svg>
+      </button>
+
+      <aside id="sidebar" class="sidebar" aria-label="Conversation sidebar">
+        <header class="sidebar-header">
+          <div class="sidebar-brand">
+            <span class="sidebar-brand-mark" aria-hidden="true"></span>
+            <span class="sidebar-label">Vaani</span>
+          </div>
+          <button
+            id="sidebar-toggle"
+            class="sidebar-icon-button"
+            type="button"
+            aria-label="Collapse conversations"
+            aria-expanded="true"
+          >
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="m14 7-5 5 5 5" />
+            </svg>
+          </button>
+        </header>
+
+        <button id="new-session" class="new-chat-button" type="button">
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M12 5v14M5 12h14" />
+          </svg>
+          <span class="sidebar-label">New conversation</span>
+        </button>
+
+        <div class="sidebar-section-heading">
+          <span class="sidebar-label">Recent</span>
+          <span id="history-count" class="sidebar-label">0 messages</span>
         </div>
-      </header>
+        <nav id="session-list" class="session-list" aria-label="Recent conversations"></nav>
+
+        <select id="session-select" class="sr-only" aria-label="Previous conversations">
+          <option value="">Current conversation</option>
+        </select>
+
+        <footer class="sidebar-footer">
+          <div class="connection" title="Voice server status">
+            <span id="connection-dot" class="connection-dot"></span>
+            <span id="connection-label" class="sidebar-label">Connecting</span>
+          </div>
+          <span class="sidebar-label sidebar-footer-copy">Sarvam voice</span>
+        </footer>
+      </aside>
+      <button
+        id="sidebar-backdrop"
+        class="sidebar-backdrop"
+        type="button"
+        aria-label="Close menu"
+      ></button>
 
       <section class="conversation-view" aria-label="Conversation" aria-live="polite">
         <div id="history" class="history">
@@ -133,15 +189,8 @@
 
       <aside id="settings-panel" class="settings-panel" hidden>
         <div class="panel-heading">
-          <span>Conversation settings</span>
-          <span id="history-count">0 messages</span>
+          <span>Voice settings</span>
         </div>
-        <label>
-          <span>Conversation</span>
-          <select id="session-select" aria-label="Previous conversations">
-            <option value="">Current conversation</option>
-          </select>
-        </label>
         <label>
           <span>Input language</span>
           <select id="language">
@@ -158,7 +207,6 @@
             <option value="pa-IN">ਪੰਜਾਬੀ</option>
           </select>
         </label>
-        <button id="new-session" class="panel-button" type="button">New conversation</button>
       </aside>
 
       <form id="upload-form" class="hidden-upload">

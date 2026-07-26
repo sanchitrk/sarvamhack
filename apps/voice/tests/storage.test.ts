@@ -16,7 +16,7 @@ describe("upload storage", () => {
   });
 
   it("keeps uploads isolated and does not overwrite an existing file", async () => {
-    const root = await mkdtemp(join(tmpdir(), "vaani-upload-"));
+    const root = await mkdtemp(join(tmpdir(), "sia-upload-"));
     const bytes = new TextEncoder().encode("important context");
 
     const first = await storeUpload(root, "session-1", "notes.txt", bytes);

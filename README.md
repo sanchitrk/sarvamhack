@@ -59,7 +59,7 @@ The browser sends 16 kHz mono PCM to Sarvam Saaras v3 over the Hono WebSocket.
 Final transcripts enter the Layer 1 Pi/OpenAI loop. Assistant deltas are split
 into speakable sentences and synthesized with Sarvam Bulbul v3.
 
-While Vaani is thinking, using a tool, or speaking, **Interrupt response**
+While Sia is thinking, using a tool, or speaking, **Interrupt response**
 immediately stops browser playback, cancels pending Sarvam TTS, and aborts the
 active Pi turn without clearing the conversation.
 
@@ -69,7 +69,7 @@ Conversations now use Pi coding-agent's persistent sessions and survive browser
 reconnects and server restarts. Use the conversation selector in the UI to
 reopen history or start a new conversation.
 
-Upload a file from the UI and Vaani will inspect it with Pi's read-only file
+Upload a file from the UI and Sia will inspect it with Pi's read-only file
 tools. PDFs, scans, JPEG/PNG document images, and ZIP archives of page images
 are digitized with Sarvam Document Intelligence into layout-preserving
 Markdown before the agent answers. Uploads and session JSONL files are stored

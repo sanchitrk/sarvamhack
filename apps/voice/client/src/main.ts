@@ -71,7 +71,7 @@ let audioContext: AudioContext | undefined;
 let sourceNode: MediaStreamAudioSourceNode | undefined;
 let workletNode: AudioWorkletNode | undefined;
 let currentAudio: HTMLAudioElement | undefined;
-let activeSessionId = window.localStorage.getItem("vaani-session") || "";
+let activeSessionId = window.localStorage.getItem("sia-session") || "";
 let historyMessages: ConversationMessage[] = [];
 let recording = false;
 let responseText = "";
@@ -109,7 +109,7 @@ function createMessage(message: ConversationMessage): HTMLElement {
   const item = document.createElement("article");
   item.className = `history-message ${message.role}`;
   const role = document.createElement("span");
-  role.textContent = message.role === "user" ? "You" : "Vaani";
+  role.textContent = message.role === "user" ? "You" : "Sia";
   const text = document.createElement("p");
   text.textContent = message.text;
   item.append(role, text);
@@ -346,7 +346,7 @@ function handleMessage(message: ServerMessage): void {
   }
   if (message.type === "session") {
     activeSessionId = message.id;
-    window.localStorage.setItem("vaani-session", message.id);
+    window.localStorage.setItem("sia-session", message.id);
     renderHistory(message.history);
     pendingUserEcho = undefined;
     responseText = "";
@@ -598,7 +598,7 @@ sidebarToggleButton.addEventListener("click", () => {
     "aria-label",
     collapsed ? "Expand conversations" : "Collapse conversations",
   );
-  window.localStorage.setItem("vaani-sidebar-collapsed", String(collapsed));
+  window.localStorage.setItem("sia-sidebar-collapsed", String(collapsed));
 });
 
 sidebarBackdrop.addEventListener("click", closeSidebarOnMobile);
@@ -629,7 +629,7 @@ uploadForm.addEventListener("submit", (event) => {
       throw new Error(payload.error || "Upload failed");
     }
 
-    uploadStatus.textContent = `${payload.name} uploaded. Vaani is reading it now.`;
+    uploadStatus.textContent = `${payload.name} uploaded. Sia is reading it now.`;
     fileInput.value = "";
     send({ type: "file", path: payload.path });
   })()
@@ -647,7 +647,7 @@ window.addEventListener("beforeunload", () => {
 });
 
 uploadButton.disabled = !activeSessionId;
-const sidebarStartsCollapsed = window.localStorage.getItem("vaani-sidebar-collapsed") === "true";
+const sidebarStartsCollapsed = window.localStorage.getItem("sia-sidebar-collapsed") === "true";
 appShell.classList.toggle("sidebar-collapsed", sidebarStartsCollapsed);
 sidebarToggleButton.setAttribute("aria-expanded", String(!sidebarStartsCollapsed));
 sidebarToggleButton.setAttribute(

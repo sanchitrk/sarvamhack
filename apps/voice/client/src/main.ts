@@ -35,6 +35,7 @@ function requiredElement<T extends Element>(selector: string): T {
 
 const voiceButton = requiredElement<HTMLButtonElement>("#voice-button");
 const voiceButtonLabel = requiredElement("#voice-button-label");
+const interruptButton = requiredElement<HTMLButtonElement>("#interrupt-button");
 const language = requiredElement<HTMLSelectElement>("#language");
 const transcript = requiredElement("#transcript");
 const response = requiredElement("#response");
@@ -84,6 +85,7 @@ function setState(state: string): void {
   const copy = stateCopy[state] || [state, ""];
   stateLabel.textContent = copy[0];
   stateDetail.textContent = copy[1];
+  interruptButton.disabled = !["speaking", "thinking", "tool"].includes(state);
 }
 
 function setText(element: Element, text: string): void {
@@ -352,6 +354,13 @@ voiceButton.addEventListener("click", () => {
     setState("error");
     stateDetail.textContent = error instanceof Error ? error.message : String(error);
   });
+});
+
+interruptButton.addEventListener("click", () => {
+  cancelAudio();
+  interruptButton.disabled = true;
+  send({ type: "cancel" });
+  setState(recording ? "listening" : "idle");
 });
 
 textForm.addEventListener("submit", (event) => {

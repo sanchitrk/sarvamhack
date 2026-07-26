@@ -179,6 +179,7 @@ class VoiceSession {
   private ttsStarted = false;
   private ttsChain: Promise<void> = Promise.resolve();
   private ttsAbort: AbortController | undefined;
+  private capturing = false;
   private closed = false;
 
   private constructor(agent: AgentRuntime) {
@@ -236,6 +237,10 @@ class VoiceSession {
     this.send({ type: "state", value });
   }
 
+  private rest(): void {
+    this.state(this.capturing ? "listening" : "idle");
+  }
+
   private publishSession(): void {
     this.send({
       type: "session",
@@ -268,23 +273,25 @@ class VoiceSession {
       return;
     }
     if (message.type === "start") {
+      this.capturing = true;
       this.connectStt(message.language || "unknown");
       return;
     }
     if (message.type === "stop") {
+      this.capturing = false;
       if (this.stt?.readyState === UpstreamSocket.OPEN) {
         this.stt.send(JSON.stringify({ type: "flush" }));
       }
-      this.state("idle");
+      this.rest();
       return;
     }
     if (message.type === "cancel") {
       await this.interrupt("user cancelled");
-      this.state("listening");
+      this.rest();
       return;
     }
     if (message.type === "playback_done") {
-      this.state("listening");
+      this.rest();
       return;
     }
     if (message.type === "file") {
@@ -525,7 +532,7 @@ class VoiceSession {
     void pending.then(() => {
       if (generation !== this.ttsGeneration || this.closed) return;
       this.send({ type: "tts_end" });
-      if (!this.ttsStarted) this.state("listening");
+      if (!this.ttsStarted) this.rest();
     });
   }
 

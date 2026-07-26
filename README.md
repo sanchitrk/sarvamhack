@@ -59,6 +59,10 @@ The browser sends 16 kHz mono PCM to Sarvam Saaras v3 over the Hono WebSocket.
 Final transcripts enter the Layer 1 Pi/OpenAI loop. Assistant deltas are split
 into speakable sentences and synthesized with Sarvam Bulbul v3.
 
+While Vaani is thinking, using a tool, or speaking, **Interrupt response**
+immediately stops browser playback, cancels pending Sarvam TTS, and aborts the
+active Pi turn without clearing the conversation.
+
 ## Layer 3 sessions and files
 
 Conversations now use Pi coding-agent's persistent sessions and survive browser

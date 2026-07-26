@@ -1,0 +1,19 @@
+{
+  "name": "@sarvamhack/core",
+  "version": "0.0.0",
+  "private": true,
+  "files": [
+    "dist"
+  ],
+  "type": "module",
+  "exports": {
+    ".": "./dist/index.mjs",
+    "./package.json": "./package.json"
+  },
+  "scripts": {
+    "build": "vp pack src/index.ts",
+    "check": "vp check",
+    "dev": "vp pack src/index.ts --watch",
+    "test": "vp test run"
+  }
+}

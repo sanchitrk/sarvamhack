@@ -24,6 +24,10 @@ import {
   AgentConfigError,
   AgentInputError,
 } from "./errors.ts";
+import {
+  createDocumentIntelligenceTool,
+  DOCUMENT_INTELLIGENCE_TOOL_NAME,
+} from "./tools/document.ts";
 import type {
   AgentConfig,
   AgentEvent,
@@ -318,6 +322,16 @@ export async function createAgent(
   const model = resolveOpenAIModel(config.model);
   const cwd = config.cwd || process.cwd();
   const agentDir = options.agentDir || join(options.sessionsDir || cwd, ".agent");
+  const documentTools = config.sarvamApiKey
+    ? [createDocumentIntelligenceTool({ apiKey: config.sarvamApiKey })]
+    : [];
+  const defaultTools = [
+    "read",
+    "grep",
+    "find",
+    "ls",
+    ...(documentTools.length > 0 ? [DOCUMENT_INTELLIGENCE_TOOL_NAME] : []),
+  ];
   let requestedSessionId = options.sessionId;
 
   return createRuntimeWithHarness(async () => {
@@ -348,7 +362,8 @@ export async function createAgent(
       systemPrompt: `${config.systemPrompt}
 
 You can inspect files in the current workspace with read, grep, find, and ls.
-When the user uploads or asks about a file, use those tools before answering.
+When the user uploads or asks about a file, inspect it with the appropriate tool before answering.
+Use document_intelligence for PDFs, scans, document images, and ZIP archives of page images.
 Never claim to have read a file unless a tool successfully returned its contents.
 If a tool cannot decode the format, explain that limitation clearly.`,
     });
@@ -366,7 +381,8 @@ If a tool cannot decode the format, explain that limitation clearly.`,
         compaction: { enabled: true },
         retry: { enabled: true, maxRetries: 2 },
       }),
-      tools: config.toolNames || ["read", "grep", "find", "ls"],
+      tools: config.toolNames || defaultTools,
+      customTools: documentTools,
     });
 
     return {

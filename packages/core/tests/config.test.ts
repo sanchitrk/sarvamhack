@@ -7,10 +7,12 @@ describe("agent configuration", () => {
   it("reads an OpenAI configuration with voice-friendly defaults", () => {
     const config = readAgentConfig({
       OPENAI_API_KEY: "test-key",
+      SARVAM_API_KEY: "sarvam-key",
     });
 
     expect(config.provider).toBe("openai");
     expect(config.model).toBe(DEFAULT_OPENAI_MODEL);
+    expect(config.sarvamApiKey).toBe("sarvam-key");
     expect(config.systemPrompt).toContain("plain text only");
   });
 

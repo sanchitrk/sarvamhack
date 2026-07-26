@@ -42,6 +42,7 @@ export function readAgentConfig(environment: NodeJS.ProcessEnv = process.env): A
     provider,
     model,
     apiKey,
+    sarvamApiKey: environment.SARVAM_API_KEY?.trim() || undefined,
     systemPrompt: environment.AGENT_SYSTEM_PROMPT?.trim() || DEFAULT_SYSTEM_PROMPT,
     cwd: environment.AGENT_CWD?.trim() || process.cwd(),
   };

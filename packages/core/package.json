@@ -22,7 +22,9 @@
   "dependencies": {
     "@earendil-works/pi-agent-core": "catalog:",
     "@earendil-works/pi-ai": "catalog:",
-    "@earendil-works/pi-coding-agent": "catalog:"
+    "@earendil-works/pi-coding-agent": "catalog:",
+    "fflate": "catalog:",
+    "sarvamai": "catalog:"
   },
   "devDependencies": {
     "@types/node": "catalog:"

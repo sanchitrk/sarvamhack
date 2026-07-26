@@ -310,7 +310,7 @@ class VoiceSession {
         return;
       }
       await this.submitTranscript(
-        `I uploaded a file at "./${relativePath}" in your current workspace. Read that path with your file tools and briefly explain its contents.`,
+        `I uploaded a file at "./${relativePath}" in your current workspace. Inspect it with the appropriate file tool, using document_intelligence for PDFs or document images, and briefly explain its contents.`,
         this.language,
       );
       return;

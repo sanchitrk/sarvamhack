@@ -69,13 +69,15 @@ Conversations now use Pi coding-agent's persistent sessions and survive browser
 reconnects and server restarts. Use the conversation selector in the UI to
 reopen history or start a new conversation.
 
-Upload a supported text or source file from the UI and Vaani will inspect it
-with Pi's read-only `read`, `grep`, `find`, and `ls` tools. Uploads and session
-JSONL files are stored locally under `apps/voice/.data/` and are not committed.
+Upload a file from the UI and Vaani will inspect it with Pi's read-only file
+tools. PDFs, scans, JPEG/PNG document images, and ZIP archives of page images
+are digitized with Sarvam Document Intelligence into layout-preserving
+Markdown before the agent answers. Uploads and session JSONL files are stored
+locally under `apps/voice/.data/` and are not committed.
 
-The UI accepts any file type up to 5 MB. Pi's tools decide whether the format is
-readable; when it is not, the agent reports that limitation instead of the
-upload being rejected.
+The UI accepts any file type up to 5 MB. Sarvam Document Intelligence supports
+documents up to 10 pages in PDF, PNG, JPEG, or ZIP form; other readable text and
+source files continue through Pi's local file tools.
 
 ## Commands
 

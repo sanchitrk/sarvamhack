@@ -11,6 +11,12 @@ export {
   AgentConfigError,
   AgentInputError,
 } from "./errors.ts";
+export {
+  createDocumentIntelligenceTool,
+  digitizeDocument,
+  DOCUMENT_INTELLIGENCE_TOOL_NAME,
+} from "./tools/document.ts";
+export type { DigitizedDocument, DigitizeDocumentOptions } from "./tools/document.ts";
 export type {
   AgentConfig,
   AgentEvent,

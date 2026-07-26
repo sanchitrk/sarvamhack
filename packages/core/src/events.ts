@@ -2,8 +2,9 @@ export interface AgentConfig {
   provider: "openai";
   model: string;
   apiKey: string;
+  sarvamApiKey?: string;
   systemPrompt: string;
-  toolNames?: Array<"read" | "grep" | "find" | "ls">;
+  toolNames?: Array<"read" | "grep" | "find" | "ls" | "document_intelligence">;
   cwd?: string;
 }
 

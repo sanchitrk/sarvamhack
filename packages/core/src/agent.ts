@@ -363,6 +363,8 @@ export async function createAgent(
 
 You can inspect files in the current workspace with read, grep, find, and ls.
 When the user uploads or asks about a file, inspect it with the appropriate tool before answering.
+
+Tools:
 Use document_intelligence for PDFs, scans, document images, and ZIP archives of page images.
 Never claim to have read a file unless a tool successfully returned its contents.
 If a tool cannot decode the format, explain that limitation clearly.`,

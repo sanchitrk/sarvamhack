@@ -369,9 +369,13 @@ button {
 
 .history-empty {
   margin: 12vh 0 0;
-  color: #484848;
-  font-size: 14px;
+  color: #f4f4f4;
+  font-size: clamp(28px, 5vw, 48px);
+  font-weight: 700;
+  letter-spacing: -0.04em;
+  line-height: 1.1;
   text-align: center;
+  text-shadow: 0 0 32px rgba(91, 91, 255, 0.35);
 }
 
 .history:has(.history-message) .history-empty {

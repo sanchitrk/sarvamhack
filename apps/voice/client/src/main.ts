@@ -166,7 +166,7 @@ function renderHistory(messages: ConversationMessage[]): void {
   if (messages.length === 0) {
     const empty = document.createElement("p");
     empty.className = "history-empty";
-    empty.textContent = "This conversation is just getting started.";
+    empty.textContent = "Sarvam ❤️ Hackathon";
     history.append(empty);
   } else {
     for (const message of messages) {

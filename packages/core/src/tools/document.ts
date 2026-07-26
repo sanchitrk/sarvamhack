@@ -237,10 +237,10 @@ export function createDocumentIntelligenceTool(
       "Digitize a document with Sarvam Vision. Use this for PDFs, scans, document images, handwriting, and table-heavy files; it returns layout-preserving Markdown.",
     promptSnippet:
       "Digitize a PDF, scan, document image, or ZIP of page images with Sarvam Vision.",
-    promptGuidelines: [
-      "Use document_intelligence before answering questions about PDFs, scans, or document images.",
-      "Pass the document's primary language when known; otherwise use en-IN.",
-    ],
+    // promptGuidelines: [
+    //   "Use document_intelligence before answering questions about PDFs, scans, or document images.",
+    //   "Pass the document's primary language when known; otherwise use en-IN.",
+    // ],
     parameters,
     executionMode: "sequential",
     async execute(_toolCallId, params, signal, onUpdate, context) {
